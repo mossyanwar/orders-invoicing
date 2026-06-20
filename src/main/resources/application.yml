@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: orders-invoicing
+  mvc:
+    problemdetails:
+      enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
