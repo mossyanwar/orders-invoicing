@@ -54,7 +54,7 @@ public class CustomerService {
         return CustomerResponse.from(customer);
     }
 
-    Customer find(long id) {
+    public Customer find(long id) {
         return customers.findById(id).orElseThrow(() -> new NotFoundException("Customer", id));
     }
 }
