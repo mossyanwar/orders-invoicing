@@ -19,6 +19,13 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  data:
+    web:
+      pageable:
+        default-page-size: 20
+        max-page-size: 100
+  jackson:
+    default-property-inclusion: non_null
 
 management:
   endpoints:
@@ -29,3 +36,6 @@ management:
     health:
       probes:
         enabled: true
+
+app:
+  timezone: Europe/London
