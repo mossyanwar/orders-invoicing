@@ -1,0 +1,64 @@
+package com.mossyanwar.ordersinvoicing.invoice;
+
+import com.mossyanwar.ordersinvoicing.common.money.LineAmounts;
+import com.mossyanwar.ordersinvoicing.common.money.Money;
+import com.mossyanwar.ordersinvoicing.common.money.VatRate;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+
+public record InvoiceResponse(
+        Long id,
+        String invoiceNumber,
+        Long orderId,
+        Long customerId,
+        String customerName,
+        String billingAddress,
+        InvoiceStatus status,
+        LocalDate issueDate,
+        LocalDate dueDate,
+        int paymentTermsDays,
+        List<Line> lines,
+        List<VatSummary> vatBreakdown,
+        Money netTotal,
+        Money vatTotal,
+        Money grossTotal,
+        Money amountPaid,
+        Money outstanding,
+        long version) {
+
+    public record Line(
+            Long id,
+            int lineNumber,
+            String sku,
+            String description,
+            int quantity,
+            Money unitPrice,
+            VatRate vatRate,
+            Money net,
+            Money vat,
+            Money gross) {
+
+        static Line from(InvoiceLine line) {
+            return new Line(line.getId(), line.getLineNumber(), line.getSku(), line.getDescription(),
+                    line.getQuantity(), line.getUnitPrice(), line.getVatRate(),
+                    line.getNetAmount(), line.getVatAmount(), line.getGrossAmount());
+        }
+    }
+
+    public record VatSummary(VatRate rate, Money net, Money vat) {
+    }
+
+    public static InvoiceResponse from(Invoice invoice) {
+        List<VatSummary> breakdown = invoice.vatBreakdown().entrySet().stream()
+                .map((Map.Entry<VatRate, LineAmounts> e) -> new VatSummary(e.getKey(), e.getValue().net(), e.getValue().vat()))
+                .toList();
+        return new InvoiceResponse(invoice.getId(), invoice.getInvoiceNumber(), invoice.getOrderId(),
+                invoice.getCustomerId(), invoice.getCustomerName(), invoice.getBillingAddress(), invoice.getStatus(),
+                invoice.getIssueDate(), invoice.getDueDate(), invoice.getPaymentTermsDays(),
+                invoice.getLines().stream().map(Line::from).toList(), breakdown,
+                invoice.getNetTotal(), invoice.getVatTotal(), invoice.getGrossTotal(),
+                invoice.getAmountPaid(), invoice.outstanding(), invoice.getVersion());
+    }
+}
