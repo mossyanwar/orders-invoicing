@@ -25,7 +25,9 @@ public record InvoiceResponse(
         Money vatTotal,
         Money grossTotal,
         Money amountPaid,
+        Money amountCredited,
         Money outstanding,
+        List<CreditNoteSummary> creditNotes,
         long version) {
 
     public record Line(
@@ -38,12 +40,20 @@ public record InvoiceResponse(
             VatRate vatRate,
             Money net,
             Money vat,
-            Money gross) {
+            Money gross,
+            int creditedQuantity) {
 
         static Line from(InvoiceLine line) {
             return new Line(line.getId(), line.getLineNumber(), line.getSku(), line.getDescription(),
                     line.getQuantity(), line.getUnitPrice(), line.getVatRate(),
-                    line.getNetAmount(), line.getVatAmount(), line.getGrossAmount());
+                    line.getNetAmount(), line.getVatAmount(), line.getGrossAmount(), line.getCreditedQuantity());
+        }
+    }
+
+    public record CreditNoteSummary(Long id, String creditNoteNumber, LocalDate issueDate, Money grossTotal) {
+
+        static CreditNoteSummary from(CreditNote note) {
+            return new CreditNoteSummary(note.getId(), note.getCreditNoteNumber(), note.getIssueDate(), note.getGrossTotal());
         }
     }
 
@@ -59,6 +69,7 @@ public record InvoiceResponse(
                 invoice.getIssueDate(), invoice.getDueDate(), invoice.getPaymentTermsDays(),
                 invoice.getLines().stream().map(Line::from).toList(), breakdown,
                 invoice.getNetTotal(), invoice.getVatTotal(), invoice.getGrossTotal(),
-                invoice.getAmountPaid(), invoice.outstanding(), invoice.getVersion());
+                invoice.getAmountPaid(), invoice.getAmountCredited(), invoice.outstanding(),
+                invoice.getCreditNotes().stream().map(CreditNoteSummary::from).toList(), invoice.getVersion());
     }
 }

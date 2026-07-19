@@ -1,5 +1,6 @@
 package com.mossyanwar.ordersinvoicing.invoice;
 
+import com.mossyanwar.ordersinvoicing.common.error.BusinessRuleException;
 import com.mossyanwar.ordersinvoicing.common.money.LineAmounts;
 import com.mossyanwar.ordersinvoicing.common.money.Money;
 import com.mossyanwar.ordersinvoicing.common.money.VatRate;
@@ -55,6 +56,8 @@ public class InvoiceLine {
     @Column(nullable = false, updatable = false)
     private Money grossAmount;
 
+    private int creditedQuantity;
+
     protected InvoiceLine() {
     }
 
@@ -74,6 +77,36 @@ public class InvoiceLine {
 
     public LineAmounts amounts() {
         return new LineAmounts(netAmount, vatAmount, grossAmount);
+    }
+
+    public int remainingQuantity() {
+        return quantity - creditedQuantity;
+    }
+
+    /**
+     * What crediting {@code count} more units of this line is worth, without changing anything.
+     *
+     * <p>VAT is rounded on the running total credited so far, and this credit is the difference.
+     * Rounding each credit on its own would drift: five separate credits of one 0.10 unit at 5%
+     * would each round 0.005 up to 0.01 and refund 0.05 of VAT on a line that only charged 0.03.
+     * Working from the cumulative figure means the credits always add up to exactly the line's VAT
+     * once everything has been credited.
+     */
+    LineAmounts creditValue(int count) {
+        if (count < 1 || count > remainingQuantity()) {
+            throw new BusinessRuleException("Line %d has %d left to credit, so %d cannot be credited"
+                    .formatted(lineNumber, remainingQuantity(), count));
+        }
+        LineAmounts before = LineAmounts.of(unitPrice, creditedQuantity, vatRate);
+        LineAmounts after = LineAmounts.of(unitPrice, creditedQuantity + count, vatRate);
+        Money net = after.net().minus(before.net());
+        Money vat = after.vat().minus(before.vat());
+        return new LineAmounts(net, vat, net.plus(vat));
+    }
+
+    void recordCredit(int count) {
+        creditValue(count);
+        creditedQuantity += count;
     }
 
     public Long getId() {
@@ -114,5 +147,9 @@ public class InvoiceLine {
 
     public Money getGrossAmount() {
         return grossAmount;
+    }
+
+    public int getCreditedQuantity() {
+        return creditedQuantity;
     }
 }

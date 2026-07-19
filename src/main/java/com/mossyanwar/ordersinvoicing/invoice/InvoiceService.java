@@ -57,9 +57,28 @@ public class InvoiceService {
         return InvoiceResponse.from(invoice);
     }
 
+    public CreditNoteResponse credit(long invoiceId, CreditNoteRequest request) {
+        Invoice invoice = find(invoiceId);
+        Instant now = clock.instant();
+        LocalDate today = LocalDate.now(clock);
+        CreditNote note = invoice.credit(request.quantitiesByLine(), request.reason().strip(), today, now,
+                () -> numbers.next(DocumentSeries.CREDIT_NOTE, today.getYear()));
+        invoices.flush();   // managed entity: flushing persists the new note itself, so it gets its id
+        return CreditNoteResponse.from(note);
+    }
+
     @Transactional(readOnly = true)
     public InvoiceResponse get(long invoiceId) {
         return InvoiceResponse.from(find(invoiceId));
+    }
+
+    @Transactional(readOnly = true)
+    public CreditNoteResponse creditNote(long invoiceId, long creditNoteId) {
+        return find(invoiceId).getCreditNotes().stream()
+                .filter(note -> note.getId() == creditNoteId)
+                .findFirst()
+                .map(CreditNoteResponse::from)
+                .orElseThrow(() -> new NotFoundException("Credit note", creditNoteId));
     }
 
     @Transactional(readOnly = true)

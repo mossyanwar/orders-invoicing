@@ -1,6 +1,7 @@
 package com.mossyanwar.ordersinvoicing.invoice;
 
 import com.mossyanwar.ordersinvoicing.common.error.BusinessRuleException;
+import com.mossyanwar.ordersinvoicing.common.error.NotFoundException;
 import com.mossyanwar.ordersinvoicing.common.money.LineAmounts;
 import com.mossyanwar.ordersinvoicing.common.money.Money;
 import com.mossyanwar.ordersinvoicing.common.money.VatRate;
@@ -25,8 +26,11 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * An issued invoice. Invoices are never edited or deleted once issued: money comes off them through
@@ -79,9 +83,16 @@ public class Invoice {
     @Column(nullable = false)
     private Money amountPaid;
 
+    @Column(nullable = false)
+    private Money amountCredited;
+
     @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL)
     @OrderBy("lineNumber")
     private List<InvoiceLine> lines = new ArrayList<>();
+
+    @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL)
+    @OrderBy("id")
+    private List<CreditNote> creditNotes = new ArrayList<>();
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
@@ -119,6 +130,7 @@ public class Invoice {
         invoice.vatTotal = totals.vat();
         invoice.grossTotal = totals.gross();
         invoice.amountPaid = Money.ZERO;
+        invoice.amountCredited = Money.ZERO;
         invoice.status = totals.gross().isZero() ? InvoiceStatus.PAID : InvoiceStatus.ISSUED;
         invoice.createdAt = now;
         invoice.updatedAt = now;
@@ -126,7 +138,7 @@ public class Invoice {
     }
 
     public Money outstanding() {
-        return grossTotal.minus(amountPaid);
+        return grossTotal.minus(amountPaid).minus(amountCredited);
     }
 
     /**
@@ -151,6 +163,68 @@ public class Invoice {
             status = InvoiceStatus.PART_PAID;
         }
         updatedAt = now;
+    }
+
+    /**
+     * Issues a credit note against some or all of the lines. An empty {@code requested} map credits
+     * everything not yet credited. {@code nextNumber} is only called once the request has passed
+     * every check, so the lock behind the gapless counter is taken as late as possible.
+     *
+     * <p>A credit can only take the balance down to zero: crediting money the customer has already
+     * paid would mean a refund, and refunds are not modelled. An invoice credited in full before any
+     * payment becomes VOID; one whose balance reaches zero through a mix of payments and credits is
+     * PAID.
+     */
+    public CreditNote credit(Map<Long, Integer> requested, String reason, LocalDate issueDate, Instant now,
+                             Supplier<String> nextNumber) {
+        if (!status.isOpen()) {
+            throw new BusinessRuleException("Invoice %s is %s; only open invoices can be credited"
+                    .formatted(invoiceNumber, status));
+        }
+        Map<InvoiceLine, Integer> plan = creditPlan(requested);
+        Map<InvoiceLine, LineAmounts> values = new LinkedHashMap<>();
+        plan.forEach((line, count) -> values.put(line, line.creditValue(count)));
+        LineAmounts total = LineAmounts.sum(values.values());
+        if (total.gross().isGreaterThan(outstanding())) {
+            throw new BusinessRuleException(("Credit of %s is more than the %s outstanding on invoice %s; "
+                    + "refunds of money already paid are not supported").formatted(total.gross(), outstanding(), invoiceNumber));
+        }
+
+        CreditNote note = new CreditNote(this, nextNumber.get(), issueDate, reason, now);
+        plan.forEach((line, count) -> {
+            note.addLine(line, count, values.get(line));
+            line.recordCredit(count);
+        });
+        creditNotes.add(note);
+        amountCredited = amountCredited.plus(total.gross());
+        if (lines.stream().allMatch(line -> line.remainingQuantity() == 0)) {
+            status = InvoiceStatus.VOID;
+        } else if (outstanding().isZero()) {
+            status = InvoiceStatus.PAID;
+        }
+        updatedAt = now;
+        return note;
+    }
+
+    private Map<InvoiceLine, Integer> creditPlan(Map<Long, Integer> requested) {
+        Map<InvoiceLine, Integer> plan = new LinkedHashMap<>();
+        if (requested.isEmpty()) {
+            lines.stream().filter(line -> line.remainingQuantity() > 0)
+                    .forEach(line -> plan.put(line, line.remainingQuantity()));
+        } else {
+            requested.forEach((lineId, count) -> plan.put(line(lineId), count));
+        }
+        if (plan.isEmpty()) {
+            throw new BusinessRuleException("Invoice " + invoiceNumber + " has nothing left to credit");
+        }
+        return plan;
+    }
+
+    private InvoiceLine line(Long lineId) {
+        return lines.stream()
+                .filter(line -> Objects.equals(line.getId(), lineId))
+                .findFirst()
+                .orElseThrow(() -> new NotFoundException("Line on invoice " + invoiceNumber, lineId));
     }
 
     /** Returns true if the invoice became overdue as a result of this call. */
@@ -229,8 +303,16 @@ public class Invoice {
         return amountPaid;
     }
 
+    public Money getAmountCredited() {
+        return amountCredited;
+    }
+
     public List<InvoiceLine> getLines() {
         return Collections.unmodifiableList(lines);
+    }
+
+    public List<CreditNote> getCreditNotes() {
+        return Collections.unmodifiableList(creditNotes);
     }
 
     public Instant getCreatedAt() {

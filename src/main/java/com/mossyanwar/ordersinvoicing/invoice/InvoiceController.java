@@ -1,6 +1,7 @@
 package com.mossyanwar.ordersinvoicing.invoice;
 
 import com.mossyanwar.ordersinvoicing.common.web.PageResponse;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -8,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,6 +33,18 @@ public class InvoiceController {
         URI location = ServletUriComponentsBuilder.fromCurrentContextPath()
                 .path("/api/invoices/{id}").buildAndExpand(invoice.id()).toUri();
         return ResponseEntity.created(location).body(invoice);
+    }
+
+    @PostMapping("/invoices/{id}/credit-notes")
+    public ResponseEntity<CreditNoteResponse> credit(@PathVariable long id, @Valid @RequestBody CreditNoteRequest request) {
+        CreditNoteResponse note = invoices.credit(id, request);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{noteId}").buildAndExpand(note.id()).toUri();
+        return ResponseEntity.created(location).body(note);
+    }
+
+    @GetMapping("/invoices/{id}/credit-notes/{noteId}")
+    public CreditNoteResponse creditNote(@PathVariable long id, @PathVariable long noteId) {
+        return invoices.creditNote(id, noteId);
     }
 
     @GetMapping("/invoices/{id}")
