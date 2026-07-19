@@ -79,6 +79,11 @@ public class OrderService {
         return orders.findById(orderId).orElseThrow(() -> new NotFoundException("Order", orderId));
     }
 
+    /** Loads the order with a row lock held until the caller's transaction ends. */
+    public Order findForUpdate(long orderId) {
+        return orders.findByIdForUpdate(orderId).orElseThrow(() -> new NotFoundException("Order", orderId));
+    }
+
     private OrderResponse transition(long orderId, BiConsumer<Order, Instant> action) {
         Order order = find(orderId);
         action.accept(order, clock.instant());

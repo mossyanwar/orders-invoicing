@@ -35,9 +35,14 @@ public class InvoiceService {
     /**
      * Issues the invoice for a fulfilled order. Everything happens in one transaction: the order
      * moves to INVOICED, the number is allocated and the invoice is saved, or none of it happens.
+     *
+     * <p>The order row is locked first. Two invoices for one order would be a serious error, so a
+     * second request for the same order waits here and then finds it already invoiced, instead of
+     * racing ahead and taking a number it will have to give back. The unique constraint on
+     * {@code invoice.order_id} is the backstop.
      */
     public InvoiceResponse issueForOrder(long orderId) {
-        Order order = orders.find(orderId);
+        Order order = orders.findForUpdate(orderId);
         if (invoices.existsByOrderId(orderId)) {
             throw new ConflictException("Order " + orderId + " has already been invoiced");
         }
