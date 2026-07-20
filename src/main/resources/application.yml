@@ -39,3 +39,8 @@ management:
 
 app:
   timezone: Europe/London
+  scheduling:
+    enabled: true
+  invoices:
+    # five past midnight, UK time
+    overdue-cron: "0 5 0 * * *"
