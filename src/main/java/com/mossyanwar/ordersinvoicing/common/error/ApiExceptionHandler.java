@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -54,9 +55,9 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.CONFLICT, ProblemTypes.CONCURRENT_UPDATE, "Concurrent update", e.getMessage());
     }
 
-    @ExceptionHandler(OptimisticLockingFailureException.class)
-    ProblemDetail optimisticLock(OptimisticLockingFailureException e) {
-        log.info("optimistic lock failure: {}", e.getMessage());
+    @ExceptionHandler({OptimisticLockingFailureException.class, PessimisticLockingFailureException.class})
+    ProblemDetail lockFailure(RuntimeException e) {
+        log.info("lock failure: {}", e.getMessage());
         return problem(HttpStatus.CONFLICT, ProblemTypes.CONCURRENT_UPDATE, "Concurrent update",
                 "The resource was changed by another request at the same time. Reload it and try again.");
     }

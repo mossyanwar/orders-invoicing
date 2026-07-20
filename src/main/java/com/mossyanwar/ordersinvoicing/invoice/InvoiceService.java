@@ -15,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.EnumSet;
+import java.util.List;
 
 @Service
 @Transactional
@@ -86,6 +88,11 @@ public class InvoiceService {
         Specification<Invoice> filter = Specification.where(InvoiceRepository.hasStatus(status))
                 .and(InvoiceRepository.forCustomer(customerId));
         return invoices.findAll(filter, pageable).map(InvoiceResponse::from);
+    }
+
+    public List<Invoice> openInvoicesOf(long customerId) {
+        return invoices.findByCustomerIdAndStatusIn(customerId,
+                EnumSet.of(InvoiceStatus.ISSUED, InvoiceStatus.PART_PAID, InvoiceStatus.OVERDUE));
     }
 
     public Invoice find(long invoiceId) {

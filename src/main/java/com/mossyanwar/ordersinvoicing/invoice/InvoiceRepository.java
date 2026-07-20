@@ -13,6 +13,8 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long>, JpaSpec
 
     boolean existsByOrderId(Long orderId);
 
+    List<Invoice> findByCustomerIdAndStatusIn(Long customerId, Collection<InvoiceStatus> statuses);
+
     @Query("select i.id from Invoice i where i.status in :statuses and i.dueDate < :today order by i.id")
     List<Long> findIdsDueBefore(LocalDate today, Collection<InvoiceStatus> statuses);
 

@@ -57,6 +57,14 @@ public class TestData {
         return orderId;
     }
 
+    /** Fulfils a new order and invoices it; returns the invoice. */
+    public JsonNode invoice(long customerId, long productId, int quantity) {
+        long orderId = fulfilledOrder(customerId, productId, quantity);
+        ResponseEntity<JsonNode> response = api.post("/api/orders/" + orderId + "/invoice", null);
+        assertThat(response.getStatusCode()).as(String.valueOf(response.getBody())).isEqualTo(HttpStatus.CREATED);
+        return response.getBody();
+    }
+
     private static long created(ResponseEntity<JsonNode> response) {
         assertThat(response.getStatusCode()).as(String.valueOf(response.getBody())).isEqualTo(HttpStatus.CREATED);
         return response.getBody().get("id").asLong();
