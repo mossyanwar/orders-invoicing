@@ -9,3 +9,7 @@ logging:
   level:
     root: warn
     com.mossyanwar.ordersinvoicing: info
+
+app:
+  scheduling:
+    enabled: false

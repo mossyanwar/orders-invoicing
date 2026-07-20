@@ -36,19 +36,20 @@ public class OrderService {
         for (OrderRequests.Line line : request.linesOrEmpty()) {
             order.addLine(products.find(line.productId()), line.quantity(), clock.instant());
         }
-        return saveAndMap(order);
+        orders.save(order);
+        return flushAndMap(order);
     }
 
     public OrderResponse addLine(long orderId, OrderRequests.Line request) {
         Order order = find(orderId);
         order.addLine(products.find(request.productId()), request.quantity(), clock.instant());
-        return saveAndMap(order);
+        return flushAndMap(order);
     }
 
     public OrderResponse removeLine(long orderId, long lineId) {
         Order order = find(orderId);
         order.removeLine(lineId, clock.instant());
-        return saveAndMap(order);
+        return flushAndMap(order);
     }
 
     public OrderResponse confirm(long orderId) {
@@ -79,14 +80,24 @@ public class OrderService {
         return orders.findById(orderId).orElseThrow(() -> new NotFoundException("Order", orderId));
     }
 
+    /** Loads the order with a row lock held until the caller's transaction ends. */
+    public Order findForUpdate(long orderId) {
+        return orders.findByIdForUpdate(orderId).orElseThrow(() -> new NotFoundException("Order", orderId));
+    }
+
     private OrderResponse transition(long orderId, BiConsumer<Order, Instant> action) {
         Order order = find(orderId);
         action.accept(order, clock.instant());
-        return saveAndMap(order);
+        return flushAndMap(order);
     }
 
-    private OrderResponse saveAndMap(Order order) {
-        Order saved = orders.saveAndFlush(order);
-        return OrderResponse.from(saved);
+    /**
+     * The order is already managed, so changes are written on flush; calling {@code save} again
+     * would merge it and copy any new lines instead of persisting the instances we hold. Flushing
+     * here means the response carries the new version and line ids.
+     */
+    private OrderResponse flushAndMap(Order order) {
+        orders.flush();
+        return OrderResponse.from(order);
     }
 }
