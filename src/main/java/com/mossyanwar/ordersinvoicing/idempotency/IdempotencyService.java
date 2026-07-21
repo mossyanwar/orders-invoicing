@@ -2,6 +2,7 @@ package com.mossyanwar.ordersinvoicing.idempotency;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mossyanwar.ordersinvoicing.security.CurrentUser;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -38,6 +39,9 @@ import java.util.regex.Pattern;
  * A request that finds the key already claimed gets the stored response replayed if the body is
  * the same (with an {@code Idempotent-Replayed: true} header), 422 if the body differs, or 409 if
  * the first request has not finished yet.
+ *
+ * <p>Keys are scoped to the operation and the authenticated user, so two clients that happen to
+ * pick the same key cannot see each other's responses.
  */
 @Service
 public class IdempotencyService {
@@ -62,11 +66,12 @@ public class IdempotencyService {
         this.clock = clock;
     }
 
-    public <T> ResponseEntity<T> execute(String scope, String key, Object request, Class<T> responseType,
+    public <T> ResponseEntity<T> execute(String operation, String key, Object request, Class<T> responseType,
                                          Supplier<ResponseEntity<T>> action) {
         if (key == null || !VALID_KEY.matcher(key).matches()) {
             throw IdempotencyProblems.invalidKey();
         }
+        String scope = operation + ":" + CurrentUser.name();
         String requestHash = hash(request);
 
         if (!claim(scope, key, requestHash)) {
