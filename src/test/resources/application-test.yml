@@ -13,3 +13,16 @@ logging:
 app:
   scheduling:
     enabled: false
+  security:
+    # cheap hashing keeps the hundreds of authenticated test requests fast
+    bcrypt-strength: 4
+    users:
+      - username: admin
+        password: admin-test-password
+        roles: [ADMIN]
+      - username: clerk
+        password: clerk-test-password
+        roles: [CLERK]
+      - username: viewer
+        password: viewer-test-password
+        roles: [VIEWER]

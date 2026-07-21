@@ -7,18 +7,40 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
+import java.util.Map;
 import java.util.UUID;
 
 /**
- * Small wrapper over {@link TestRestTemplate} so tests read as API calls. Every POST carries a fresh
- * Idempotency-Key unless the test passes its own headers.
+ * Small wrapper over {@link TestRestTemplate} so tests read as API calls. Requests are sent as the
+ * admin user unless {@link #as} picks another, and every POST carries a fresh Idempotency-Key
+ * unless the test passes its own headers.
  */
 public class Api {
 
+    /** Users from application-test.yml. */
+    public static final Map<String, String> PASSWORDS = Map.of(
+            "admin", "admin-test-password",
+            "clerk", "clerk-test-password",
+            "viewer", "viewer-test-password");
+
+    private final TestRestTemplate base;
     private final TestRestTemplate rest;
 
-    public Api(TestRestTemplate rest) {
-        this.rest = rest;
+    public Api(TestRestTemplate base) {
+        this(base, "admin");
+    }
+
+    private Api(TestRestTemplate base, String username) {
+        this.base = base;
+        this.rest = username == null ? base : base.withBasicAuth(username, PASSWORDS.get(username));
+    }
+
+    public Api as(String username) {
+        return new Api(base, username);
+    }
+
+    public Api anonymous() {
+        return new Api(base, null);
     }
 
     public ResponseEntity<JsonNode> get(String path) {

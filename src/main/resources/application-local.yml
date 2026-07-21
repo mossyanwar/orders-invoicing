@@ -1,0 +1,13 @@
+# For running on a developer machine only: ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+app:
+  security:
+    users:
+      - username: admin
+        password: admin-local
+        roles: [ADMIN]
+      - username: clerk
+        password: clerk-local
+        roles: [CLERK]
+      - username: viewer
+        password: viewer-local
+        roles: [VIEWER]
