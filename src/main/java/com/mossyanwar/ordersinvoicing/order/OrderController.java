@@ -1,6 +1,7 @@
 package com.mossyanwar.ordersinvoicing.order;
 
 import com.mossyanwar.ordersinvoicing.common.web.PageResponse;
+import com.mossyanwar.ordersinvoicing.idempotency.IdempotencyService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -23,16 +25,21 @@ import java.net.URI;
 public class OrderController {
 
     private final OrderService orders;
+    private final IdempotencyService idempotency;
 
-    public OrderController(OrderService orders) {
+    public OrderController(OrderService orders, IdempotencyService idempotency) {
         this.orders = orders;
+        this.idempotency = idempotency;
     }
 
     @PostMapping
-    public ResponseEntity<OrderResponse> create(@Valid @RequestBody OrderRequests.Create request) {
-        OrderResponse created = orders.create(request);
-        URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(created.id()).toUri();
-        return ResponseEntity.created(location).body(created);
+    public ResponseEntity<OrderResponse> create(@RequestHeader(IdempotencyService.HEADER) String idempotencyKey,
+                                                @Valid @RequestBody OrderRequests.Create request) {
+        return idempotency.execute("create-order", idempotencyKey, request, OrderResponse.class, () -> {
+            OrderResponse created = orders.create(request);
+            URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(created.id()).toUri();
+            return ResponseEntity.created(location).body(created);
+        });
     }
 
     @GetMapping("/{id}")

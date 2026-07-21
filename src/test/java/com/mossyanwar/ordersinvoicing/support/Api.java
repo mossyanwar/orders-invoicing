@@ -7,7 +7,12 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
-/** Small wrapper over {@link TestRestTemplate} so tests read as API calls. */
+import java.util.UUID;
+
+/**
+ * Small wrapper over {@link TestRestTemplate} so tests read as API calls. Every POST carries a fresh
+ * Idempotency-Key unless the test passes its own headers.
+ */
 public class Api {
 
     private final TestRestTemplate rest;
@@ -21,7 +26,11 @@ public class Api {
     }
 
     public ResponseEntity<JsonNode> post(String path, Object body) {
-        return exchange(HttpMethod.POST, path, body, new HttpHeaders());
+        return exchange(HttpMethod.POST, path, body, withKey(UUID.randomUUID().toString()));
+    }
+
+    public ResponseEntity<JsonNode> post(String path, Object body, String idempotencyKey) {
+        return exchange(HttpMethod.POST, path, body, withKey(idempotencyKey));
     }
 
     public ResponseEntity<JsonNode> post(String path, Object body, HttpHeaders headers) {
@@ -38,6 +47,12 @@ public class Api {
 
     public <T> ResponseEntity<T> getRaw(String path, Class<T> type) {
         return rest.exchange(path, HttpMethod.GET, new HttpEntity<>(new HttpHeaders()), type);
+    }
+
+    private static HttpHeaders withKey(String idempotencyKey) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Idempotency-Key", idempotencyKey);
+        return headers;
     }
 
     private ResponseEntity<JsonNode> exchange(HttpMethod method, String path, Object body, HttpHeaders headers) {

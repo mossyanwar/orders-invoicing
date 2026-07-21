@@ -47,3 +47,6 @@ app:
   invoices:
     # five past midnight, UK time
     overdue-cron: "0 5 0 * * *"
+  idempotency:
+    retention: PT24H
+    cleanup-cron: "0 15 * * * *"
