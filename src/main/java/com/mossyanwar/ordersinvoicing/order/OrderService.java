@@ -1,5 +1,7 @@
 package com.mossyanwar.ordersinvoicing.order;
 
+import com.mossyanwar.ordersinvoicing.audit.AuditLog;
+import com.mossyanwar.ordersinvoicing.audit.AuditedEntity;
 import com.mossyanwar.ordersinvoicing.common.error.NotFoundException;
 import com.mossyanwar.ordersinvoicing.customer.Customer;
 import com.mossyanwar.ordersinvoicing.customer.CustomerService;
@@ -21,12 +23,15 @@ public class OrderService {
     private final OrderRepository orders;
     private final CustomerService customers;
     private final ProductService products;
+    private final AuditLog audit;
     private final Clock clock;
 
-    public OrderService(OrderRepository orders, CustomerService customers, ProductService products, Clock clock) {
+    public OrderService(OrderRepository orders, CustomerService customers, ProductService products, AuditLog audit,
+                        Clock clock) {
         this.orders = orders;
         this.customers = customers;
         this.products = products;
+        this.audit = audit;
         this.clock = clock;
     }
 
@@ -37,31 +42,35 @@ public class OrderService {
             order.addLine(products.find(line.productId()), line.quantity(), clock.instant());
         }
         orders.save(order);
+        audit.record(AuditedEntity.ORDER, order.getId(), "CREATED", null, order.getStatus(),
+                order.getLines().size() + " line(s) for customer " + customer.getId());
         return flushAndMap(order);
     }
 
     public OrderResponse addLine(long orderId, OrderRequests.Line request) {
         Order order = find(orderId);
-        order.addLine(products.find(request.productId()), request.quantity(), clock.instant());
+        OrderLine line = order.addLine(products.find(request.productId()), request.quantity(), clock.instant());
+        audit.record(AuditedEntity.ORDER, orderId, "LINE_ADDED", line.getSku() + " x " + line.getQuantity());
         return flushAndMap(order);
     }
 
     public OrderResponse removeLine(long orderId, long lineId) {
         Order order = find(orderId);
         order.removeLine(lineId, clock.instant());
+        audit.record(AuditedEntity.ORDER, orderId, "LINE_REMOVED", "line " + lineId);
         return flushAndMap(order);
     }
 
     public OrderResponse confirm(long orderId) {
-        return transition(orderId, Order::confirm);
+        return transition(orderId, Order::confirm, "CONFIRMED");
     }
 
     public OrderResponse fulfil(long orderId) {
-        return transition(orderId, Order::fulfil);
+        return transition(orderId, Order::fulfil, "FULFILLED");
     }
 
     public OrderResponse cancel(long orderId) {
-        return transition(orderId, Order::cancel);
+        return transition(orderId, Order::cancel, "CANCELLED");
     }
 
     @Transactional(readOnly = true)
@@ -85,9 +94,11 @@ public class OrderService {
         return orders.findByIdForUpdate(orderId).orElseThrow(() -> new NotFoundException("Order", orderId));
     }
 
-    private OrderResponse transition(long orderId, BiConsumer<Order, Instant> action) {
+    private OrderResponse transition(long orderId, BiConsumer<Order, Instant> action, String auditAction) {
         Order order = find(orderId);
+        OrderStatus from = order.getStatus();
         action.accept(order, clock.instant());
+        audit.record(AuditedEntity.ORDER, orderId, auditAction, from, order.getStatus(), null);
         return flushAndMap(order);
     }
 

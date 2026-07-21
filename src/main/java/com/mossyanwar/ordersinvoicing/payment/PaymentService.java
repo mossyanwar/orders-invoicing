@@ -1,5 +1,7 @@
 package com.mossyanwar.ordersinvoicing.payment;
 
+import com.mossyanwar.ordersinvoicing.audit.AuditLog;
+import com.mossyanwar.ordersinvoicing.audit.AuditedEntity;
 import com.mossyanwar.ordersinvoicing.common.error.BusinessRuleException;
 import com.mossyanwar.ordersinvoicing.common.error.NotFoundException;
 import com.mossyanwar.ordersinvoicing.common.money.Money;
@@ -7,6 +9,7 @@ import com.mossyanwar.ordersinvoicing.customer.Customer;
 import com.mossyanwar.ordersinvoicing.customer.CustomerService;
 import com.mossyanwar.ordersinvoicing.invoice.Invoice;
 import com.mossyanwar.ordersinvoicing.invoice.InvoiceService;
+import com.mossyanwar.ordersinvoicing.invoice.InvoiceStatus;
 import com.mossyanwar.ordersinvoicing.payment.PaymentAllocator.Allocation;
 import com.mossyanwar.ordersinvoicing.payment.PaymentAllocator.OpenInvoice;
 import org.springframework.data.domain.Page;
@@ -26,12 +29,15 @@ public class PaymentService {
     private final PaymentRepository payments;
     private final CustomerService customers;
     private final InvoiceService invoices;
+    private final AuditLog audit;
     private final Clock clock;
 
-    public PaymentService(PaymentRepository payments, CustomerService customers, InvoiceService invoices, Clock clock) {
+    public PaymentService(PaymentRepository payments, CustomerService customers, InvoiceService invoices,
+                          AuditLog audit, Clock clock) {
         this.payments = payments;
         this.customers = customers;
         this.invoices = invoices;
+        this.audit = audit;
         this.clock = clock;
     }
 
@@ -61,10 +67,15 @@ public class PaymentService {
             if (!Objects.equals(invoice.getCustomerId(), customer.getId())) {
                 throw new BusinessRuleException("Invoice %s belongs to a different customer".formatted(invoice.getInvoiceNumber()));
             }
+            InvoiceStatus was = invoice.getStatus();
             payment.allocateTo(invoice, allocation.amount(), now);
+            audit.record(AuditedEntity.INVOICE, invoice.getId(), "PAYMENT_APPLIED", was, invoice.getStatus(),
+                    allocation.amount() + " applied, " + invoice.outstanding() + " outstanding");
         }
         payments.save(payment);
         payments.flush();   // surfaces a version clash here, inside the service, rather than at commit
+        audit.record(AuditedEntity.PAYMENT, payment.getId(), "RECORDED",
+                "%s by %s from customer %d".formatted(amount, request.method(), customer.getId()));
         return PaymentResponse.from(payment);
     }
 

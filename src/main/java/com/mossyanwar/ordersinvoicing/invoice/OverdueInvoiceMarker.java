@@ -1,5 +1,7 @@
 package com.mossyanwar.ordersinvoicing.invoice;
 
+import com.mossyanwar.ordersinvoicing.audit.AuditLog;
+import com.mossyanwar.ordersinvoicing.audit.AuditedEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -24,11 +26,13 @@ public class OverdueInvoiceMarker {
     private static final Logger log = LoggerFactory.getLogger(OverdueInvoiceMarker.class);
 
     private final InvoiceRepository invoices;
+    private final AuditLog audit;
     private final TransactionTemplate tx;
     private final Clock clock;
 
-    public OverdueInvoiceMarker(InvoiceRepository invoices, TransactionTemplate tx, Clock clock) {
+    public OverdueInvoiceMarker(InvoiceRepository invoices, AuditLog audit, TransactionTemplate tx, Clock clock) {
         this.invoices = invoices;
+        this.audit = audit;
         this.tx = tx;
         this.clock = clock;
     }
@@ -51,7 +55,15 @@ public class OverdueInvoiceMarker {
 
     private boolean markOne(long invoiceId, LocalDate today) {
         return invoices.findById(invoiceId)
-                .map(invoice -> invoice.markOverdueIfPastDue(today, clock.instant()))
+                .map(invoice -> {
+                    InvoiceStatus was = invoice.getStatus();
+                    boolean marked = invoice.markOverdueIfPastDue(today, clock.instant());
+                    if (marked) {
+                        audit.record(AuditedEntity.INVOICE, invoiceId, "MARKED_OVERDUE", was, invoice.getStatus(),
+                                "due " + invoice.getDueDate());
+                    }
+                    return marked;
+                })
                 .orElse(false);
     }
 }
