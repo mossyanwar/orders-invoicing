@@ -98,8 +98,8 @@ public class InvoiceService {
 
     @Transactional(readOnly = true)
     public Page<InvoiceResponse> list(InvoiceStatus status, Long customerId, Pageable pageable) {
-        Specification<Invoice> filter = Specification.where(InvoiceRepository.hasStatus(status))
-                .and(InvoiceRepository.forCustomer(customerId));
+        Specification<Invoice> filter = Specification.allOf(InvoiceRepository.hasStatus(status),
+                InvoiceRepository.forCustomer(customerId));
         return invoices.findAll(filter, pageable).map(InvoiceResponse::from);
     }
 

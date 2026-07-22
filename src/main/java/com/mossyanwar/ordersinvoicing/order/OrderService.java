@@ -80,8 +80,8 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public Page<OrderResponse> list(OrderStatus status, Long customerId, Pageable pageable) {
-        Specification<Order> filter = Specification.where(OrderRepository.hasStatus(status))
-                .and(OrderRepository.forCustomer(customerId));
+        Specification<Order> filter = Specification.allOf(OrderRepository.hasStatus(status),
+                OrderRepository.forCustomer(customerId));
         return orders.findAll(filter, pageable).map(OrderResponse::from);
     }
 
