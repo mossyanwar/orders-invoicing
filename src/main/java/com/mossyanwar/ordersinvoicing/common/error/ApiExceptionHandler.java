@@ -19,8 +19,8 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import java.net.URI;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Maps exceptions to RFC 7807 problem details. Spring MVC's own exceptions (bad JSON, missing
@@ -80,7 +80,8 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, ProblemTypes.VALIDATION, "Invalid request",
                 "One or more parameters are invalid.");
         problem.setProperty("errors", e.getConstraintViolations().stream()
-                .map(v -> Map.of("field", v.getPropertyPath().toString(), "message", v.getMessage()))
+                .map(v -> new FieldProblem(v.getPropertyPath().toString(), v.getMessage()))
+                .sorted(FieldProblem.ORDER)
                 .toList());
         return problem;
     }
@@ -99,13 +100,18 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                                                                   @NonNull WebRequest request) {
         ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, ProblemTypes.VALIDATION, "Invalid request",
                 "The request body has invalid fields.");
-        List<Map<String, String>> errors = ex.getBindingResult().getFieldErrors().stream()
-                .map(error -> Map.of(
-                        "field", error.getField(),
-                        "message", String.valueOf(error.getDefaultMessage())))
+        List<FieldProblem> errors = ex.getBindingResult().getFieldErrors().stream()
+                .map(error -> new FieldProblem(error.getField(), String.valueOf(error.getDefaultMessage())))
+                .sorted(FieldProblem.ORDER)
                 .toList();
         problem.setProperty("errors", errors);
         return handleExceptionInternal(ex, problem, headers, HttpStatus.BAD_REQUEST, request);
+    }
+
+    /** One invalid field. Sorted so the response is the same every time for the same request. */
+    record FieldProblem(String field, String message) {
+        static final Comparator<FieldProblem> ORDER =
+                Comparator.comparing(FieldProblem::field).thenComparing(FieldProblem::message);
     }
 
     private static ProblemDetail problem(HttpStatus status, URI type, String title, String detail) {
