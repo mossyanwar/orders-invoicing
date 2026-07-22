@@ -1,6 +1,8 @@
 spring:
   application:
     name: orders-invoicing
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/orders}
     username: ${DB_USERNAME:orders}
@@ -29,6 +31,17 @@ spring:
         max-page-size: 100
   jackson:
     default-property-inclusion: non_null
+
+server:
+  # finish in-flight requests before stopping, so a deploy does not cut a payment off half way
+  shutdown: graceful
+
+springdoc:
+  # on for this project; set SPRINGDOC_API_DOCS_ENABLED=false and SPRINGDOC_SWAGGER_UI_ENABLED=false to hide them
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
 
 management:
   endpoints:
