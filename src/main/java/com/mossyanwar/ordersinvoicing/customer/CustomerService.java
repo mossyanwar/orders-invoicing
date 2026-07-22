@@ -1,5 +1,7 @@
 package com.mossyanwar.ordersinvoicing.customer;
 
+import com.mossyanwar.ordersinvoicing.audit.AuditLog;
+import com.mossyanwar.ordersinvoicing.audit.AuditedEntity;
 import com.mossyanwar.ordersinvoicing.common.error.ConcurrentUpdateException;
 import com.mossyanwar.ordersinvoicing.common.error.ConflictException;
 import com.mossyanwar.ordersinvoicing.common.error.NotFoundException;
@@ -15,10 +17,12 @@ import java.time.Clock;
 public class CustomerService {
 
     private final CustomerRepository customers;
+    private final AuditLog audit;
     private final Clock clock;
 
-    public CustomerService(CustomerRepository customers, Clock clock) {
+    public CustomerService(CustomerRepository customers, AuditLog audit, Clock clock) {
         this.customers = customers;
+        this.audit = audit;
         this.clock = clock;
     }
 
@@ -26,9 +30,10 @@ public class CustomerService {
         if (customers.existsByEmail(Customer.normaliseEmail(request.email()))) {
             throw new ConflictException("A customer with email " + request.email() + " already exists");
         }
-        Customer customer = new Customer(request.name(), request.email(), request.billingAddress(),
-                request.paymentTermsOrDefault(), clock.instant());
-        return CustomerResponse.from(customers.save(customer));
+        Customer customer = customers.save(new Customer(request.name(), request.email(), request.billingAddress(),
+                request.paymentTermsOrDefault(), clock.instant()));
+        audit.record(AuditedEntity.CUSTOMER, customer.getId(), "CREATED", customer.getName());
+        return CustomerResponse.from(customer);
     }
 
     @Transactional(readOnly = true)
@@ -51,6 +56,7 @@ public class CustomerService {
         }
         customer.update(request.name(), request.email(), request.billingAddress(), request.paymentTermsDays());
         customers.flush();
+        audit.record(AuditedEntity.CUSTOMER, id, "UPDATED", "payment terms " + customer.getPaymentTermsDays() + " days");
         return CustomerResponse.from(customer);
     }
 

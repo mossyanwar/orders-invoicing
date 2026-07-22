@@ -39,6 +39,8 @@ management:
     health:
       probes:
         enabled: true
+      show-details: when-authorized
+      roles: ADMIN
 
 app:
   timezone: Europe/London
@@ -47,6 +49,19 @@ app:
   invoices:
     # five past midnight, UK time
     overdue-cron: "0 5 0 * * *"
+  security:
+    bcrypt-strength: 10
+    # passwords have no defaults on purpose: set them in the environment (see README)
+    users:
+      - username: admin
+        password: ${APP_ADMIN_PASSWORD:}
+        roles: [ADMIN]
+      - username: clerk
+        password: ${APP_CLERK_PASSWORD:}
+        roles: [CLERK]
+      - username: viewer
+        password: ${APP_VIEWER_PASSWORD:}
+        roles: [VIEWER]
   idempotency:
     retention: PT24H
     cleanup-cron: "0 15 * * * *"

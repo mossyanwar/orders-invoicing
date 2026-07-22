@@ -2,6 +2,7 @@ package com.mossyanwar.ordersinvoicing.payment;
 
 import com.mossyanwar.ordersinvoicing.common.web.PageResponse;
 import com.mossyanwar.ordersinvoicing.idempotency.IdempotencyService;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -32,8 +33,10 @@ public class PaymentController {
     }
 
     @PostMapping
-    public ResponseEntity<PaymentResponse> record(@RequestHeader(IdempotencyService.HEADER) String idempotencyKey,
-                                                  @Valid @RequestBody PaymentRequest request) {
+    public ResponseEntity<PaymentResponse> record(
+            @Parameter(description = IdempotencyService.HEADER_DESCRIPTION)
+            @RequestHeader(IdempotencyService.HEADER) String idempotencyKey,
+            @Valid @RequestBody PaymentRequest request) {
         return idempotency.execute("record-payment", idempotencyKey, request, PaymentResponse.class, () -> {
             PaymentResponse payment = payments.record(request);
             URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(payment.id()).toUri();

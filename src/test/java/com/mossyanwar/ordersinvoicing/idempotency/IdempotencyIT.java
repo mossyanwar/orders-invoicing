@@ -75,6 +75,21 @@ class IdempotencyIT {
     }
 
     @Test
+    void keysBelongToTheUserWhoSentThem() {
+        long customer = data.customer();
+        long product = data.product("3.00", "ZERO");
+        String key = "shared-key-" + UUID.randomUUID();
+
+        ResponseEntity<JsonNode> clerks = api.as("clerk").post("/api/orders", orderFor(customer, product), key);
+        ResponseEntity<JsonNode> admins = api.post("/api/orders", Map.of("customerId", customer), key);
+
+        assertThat(clerks.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(admins.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(admins.getHeaders().containsKey(IdempotencyService.REPLAYED_HEADER)).isFalse();
+        assertThat(ordersOf(customer)).isEqualTo(2);
+    }
+
+    @Test
     void theHeaderIsRequired() {
         ResponseEntity<JsonNode> response = api.post("/api/orders", orderFor(data.customer(), data.product("1.00", "ZERO")),
                 new HttpHeaders());

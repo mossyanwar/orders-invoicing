@@ -1,11 +1,14 @@
 package com.mossyanwar.ordersinvoicing.invoice;
 
+import com.mossyanwar.ordersinvoicing.audit.AuditLog;
+import com.mossyanwar.ordersinvoicing.audit.AuditedEntity;
 import com.mossyanwar.ordersinvoicing.common.error.ConflictException;
 import com.mossyanwar.ordersinvoicing.common.error.NotFoundException;
 import com.mossyanwar.ordersinvoicing.invoice.numbering.DocumentNumberAllocator;
 import com.mossyanwar.ordersinvoicing.invoice.numbering.DocumentSeries;
 import com.mossyanwar.ordersinvoicing.order.Order;
 import com.mossyanwar.ordersinvoicing.order.OrderService;
+import com.mossyanwar.ordersinvoicing.order.OrderStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -25,12 +28,15 @@ public class InvoiceService {
     private final InvoiceRepository invoices;
     private final OrderService orders;
     private final DocumentNumberAllocator numbers;
+    private final AuditLog audit;
     private final Clock clock;
 
-    public InvoiceService(InvoiceRepository invoices, OrderService orders, DocumentNumberAllocator numbers, Clock clock) {
+    public InvoiceService(InvoiceRepository invoices, OrderService orders, DocumentNumberAllocator numbers,
+                          AuditLog audit, Clock clock) {
         this.invoices = invoices;
         this.orders = orders;
         this.numbers = numbers;
+        this.audit = audit;
         this.clock = clock;
     }
 
@@ -51,21 +57,28 @@ public class InvoiceService {
         Instant now = clock.instant();
         LocalDate today = LocalDate.now(clock);
 
+        OrderStatus orderWas = order.getStatus();
         order.markInvoiced(now);   // throws unless the order is FULFILLED
 
         // allocated last so the lock on the counter row is held for as short a time as possible
         String number = numbers.next(DocumentSeries.INVOICE, today.getYear());
         Invoice invoice = invoices.save(Invoice.issue(order, number, today, now));
+        audit.record(AuditedEntity.ORDER, orderId, "INVOICED", orderWas, order.getStatus(), number);
+        audit.record(AuditedEntity.INVOICE, invoice.getId(), "ISSUED", null, invoice.getStatus(),
+                "%s for %s, due %s".formatted(number, invoice.getGrossTotal(), invoice.getDueDate()));
         return InvoiceResponse.from(invoice);
     }
 
     public CreditNoteResponse credit(long invoiceId, CreditNoteRequest request) {
         Invoice invoice = find(invoiceId);
+        InvoiceStatus statusWas = invoice.getStatus();
         Instant now = clock.instant();
         LocalDate today = LocalDate.now(clock);
         CreditNote note = invoice.credit(request.quantitiesByLine(), request.reason().strip(), today, now,
                 () -> numbers.next(DocumentSeries.CREDIT_NOTE, today.getYear()));
         invoices.flush();   // managed entity: flushing persists the new note itself, so it gets its id
+        audit.record(AuditedEntity.INVOICE, invoiceId, "CREDITED", statusWas, invoice.getStatus(),
+                "%s for %s: %s".formatted(note.getCreditNoteNumber(), note.getGrossTotal(), note.getReason()));
         return CreditNoteResponse.from(note);
     }
 
