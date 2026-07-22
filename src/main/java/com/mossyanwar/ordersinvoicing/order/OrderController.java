@@ -2,6 +2,7 @@ package com.mossyanwar.ordersinvoicing.order;
 
 import com.mossyanwar.ordersinvoicing.common.web.PageResponse;
 import com.mossyanwar.ordersinvoicing.idempotency.IdempotencyService;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -33,8 +34,10 @@ public class OrderController {
     }
 
     @PostMapping
-    public ResponseEntity<OrderResponse> create(@RequestHeader(IdempotencyService.HEADER) String idempotencyKey,
-                                                @Valid @RequestBody OrderRequests.Create request) {
+    public ResponseEntity<OrderResponse> create(
+            @Parameter(description = IdempotencyService.HEADER_DESCRIPTION)
+            @RequestHeader(IdempotencyService.HEADER) String idempotencyKey,
+            @Valid @RequestBody OrderRequests.Create request) {
         return idempotency.execute("create-order", idempotencyKey, request, OrderResponse.class, () -> {
             OrderResponse created = orders.create(request);
             URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(created.id()).toUri();

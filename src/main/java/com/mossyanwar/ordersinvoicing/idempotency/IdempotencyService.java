@@ -48,6 +48,8 @@ public class IdempotencyService {
 
     public static final String HEADER = "Idempotency-Key";
     public static final String REPLAYED_HEADER = "Idempotent-Replayed";
+    public static final String HEADER_DESCRIPTION =
+            "Unique per logical request, for example a UUID. A retry with the same key and body replays the first response.";
 
     private static final Pattern VALID_KEY = Pattern.compile("[A-Za-z0-9_\\-:.]{1,100}");
 
