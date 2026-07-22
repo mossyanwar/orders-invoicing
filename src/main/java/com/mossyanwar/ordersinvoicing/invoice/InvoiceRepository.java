@@ -1,5 +1,7 @@
 package com.mossyanwar.ordersinvoicing.invoice;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -12,6 +14,8 @@ import java.util.List;
 public interface InvoiceRepository extends JpaRepository<Invoice, Long>, JpaSpecificationExecutor<Invoice> {
 
     boolean existsByOrderId(Long orderId);
+
+    Page<Invoice> findByIssueDateBetween(LocalDate from, LocalDate to, Pageable pageable);
 
     List<Invoice> findByCustomerIdAndStatusIn(Long customerId, Collection<InvoiceStatus> statuses);
 
