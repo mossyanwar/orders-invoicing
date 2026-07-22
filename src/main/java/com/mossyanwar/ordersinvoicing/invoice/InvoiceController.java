@@ -1,10 +1,14 @@
 package com.mossyanwar.ordersinvoicing.invoice;
 
 import com.mossyanwar.ordersinvoicing.common.web.PageResponse;
+import com.mossyanwar.ordersinvoicing.invoice.document.InvoicePdfRenderer;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,9 +26,11 @@ import java.net.URI;
 public class InvoiceController {
 
     private final InvoiceService invoices;
+    private final InvoicePdfRenderer pdf;
 
-    public InvoiceController(InvoiceService invoices) {
+    public InvoiceController(InvoiceService invoices, InvoicePdfRenderer pdf) {
         this.invoices = invoices;
+        this.pdf = pdf;
     }
 
     @PostMapping("/orders/{orderId}/invoice")
@@ -50,6 +56,16 @@ public class InvoiceController {
     @GetMapping("/invoices/{id}")
     public InvoiceResponse get(@PathVariable long id) {
         return invoices.get(id);
+    }
+
+    @GetMapping(value = "/invoices/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> pdf(@PathVariable long id) {
+        InvoiceResponse invoice = invoices.get(id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
+                        .filename(invoice.invoiceNumber() + ".pdf").build().toString())
+                .body(pdf.render(invoice));
     }
 
     @GetMapping("/invoices")

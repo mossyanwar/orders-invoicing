@@ -44,6 +44,12 @@ management:
 
 app:
   timezone: Europe/London
+  # placeholder seller details printed on invoices; replace with the real business's
+  seller:
+    name: Example Trading Ltd
+    address: "Unit 4, Example Park, Leeds LS1 4AB"
+    vat-number: GB000000000
+    email: accounts@example.test
   scheduling:
     enabled: true
   invoices:
