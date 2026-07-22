@@ -1,0 +1,38 @@
+# Local stack: the app plus PostgreSQL 17.
+#   docker compose up --build
+# The passwords below are for local use only. Override them by exporting the variables first.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: orders
+      POSTGRES_USER: orders
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-orders}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orders -d orders"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/orders
+      DB_USERNAME: orders
+      DB_PASSWORD: ${DB_PASSWORD:-orders}
+      APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:-admin-local}
+      APP_CLERK_PASSWORD: ${APP_CLERK_PASSWORD:-clerk-local}
+      APP_VIEWER_PASSWORD: ${APP_VIEWER_PASSWORD:-viewer-local}
+      JAVA_OPTS: "-XX:MaxRAMPercentage=75"
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:
