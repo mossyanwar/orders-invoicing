@@ -385,7 +385,7 @@ with `WWW-Authenticate: Basic realm="orders-invoicing"`.
 |---|---|---|
 | GET | `/api/customers`, `/api/customers/{id}` | VIEWER |
 | POST, PUT | `/api/customers`, `/api/customers/{id}` | CLERK |
-| GET | `/api/products?includeInactive=` , `/api/products/{id}` | VIEWER |
+| GET | `/api/products?includeInactive=`, `/api/products/{id}` | VIEWER |
 | POST, PUT | `/api/products`, `/api/products/{id}` | ADMIN |
 | GET | `/api/orders?status=&customerId=`, `/api/orders/{id}` | VIEWER |
 | POST | `/api/orders` (Idempotency-Key) | CLERK |
