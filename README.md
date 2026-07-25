@@ -235,7 +235,7 @@ Test JVMs are capped at 512 MB (unit) and 768 MB (integration) in `pom.xml`.
 
 ## API examples
 
-Captured from a local run of the packaged jar against PostgreSQL 17 (embedded) on 22 July 2026,
+Captured from a local run of the packaged jar against PostgreSQL 17 (embedded) on 25 July 2026,
 using the `local` profile users. That run used port 18080; it is shown as 8080 here. Some response
 headers and fields are trimmed.
 
@@ -311,7 +311,7 @@ curl -u clerk:clerk-local -X POST localhost:8080/api/orders/1/invoice
 
 ```
 {"id":1,"invoiceNumber":"INV-2026-000001","orderId":1,"status":"ISSUED",
- "issueDate":"2026-07-22","dueDate":"2026-08-21","paymentTermsDays":30,
+ "issueDate":"2026-07-25","dueDate":"2026-08-24","paymentTermsDays":30,
  "vatBreakdown":[{"rate":"STANDARD","net":139.93,"vat":27.99},{"rate":"ZERO","net":16.00,"vat":0.00}],
  "netTotal":155.93,"vatTotal":27.99,"grossTotal":183.92,
  "amountPaid":0.00,"amountCredited":0.00,"outstanding":183.92,"creditNotes":[],"version":0, ...}
@@ -321,8 +321,8 @@ Record a payment. With no `allocations` it pays the customer's invoices oldest d
 
 ```bash
 curl -u clerk:clerk-local -X POST localhost:8080/api/payments \
-  -H 'Content-Type: application/json' -H 'Idempotency-Key: pay-2026-07-22-001' \
-  -d '{"customerId":1,"amount":"100.00","receivedOn":"2026-07-22","method":"BANK_TRANSFER","reference":"BACS ACME 4471"}'
+  -H 'Content-Type: application/json' -H 'Idempotency-Key: pay-2026-07-25-001' \
+  -d '{"customerId":1,"amount":"100.00","receivedOn":"2026-07-25","method":"BANK_TRANSFER","reference":"BACS ACME 4471"}'
 # {"id":1,"customerId":1,"amount":100.00,...,"allocations":[{"invoiceId":1,"invoiceNumber":"INV-2026-000001","amount":100.00}]}
 ```
 
@@ -359,7 +359,7 @@ curl -u viewer:viewer-local 'localhost:8080/api/invoices/export.csv?from=2026-07
 
 ```
 invoice_number,issue_date,due_date,customer_id,customer_name,status,net_total,vat_total,gross_total,amount_paid,amount_credited,outstanding
-INV-2026-000001,2026-07-22,2026-08-21,1,Acme Ltd,PART_PAID,155.93,27.99,183.92,100.00,8.00,75.92
+INV-2026-000001,2026-07-25,2026-08-24,1,Acme Ltd,PART_PAID,155.93,27.99,183.92,100.00,8.00,75.92
 ```
 
 Audit trail for the invoice (ADMIN only):
@@ -370,7 +370,7 @@ curl -u admin:admin-local 'localhost:8080/api/audit-events?entityType=INVOICE&en
 
 ```
 {"content":[
-  {"actor":"clerk","action":"ISSUED","toStatus":"ISSUED","detail":"INV-2026-000001 for 183.92, due 2026-08-21"},
+  {"actor":"clerk","action":"ISSUED","toStatus":"ISSUED","detail":"INV-2026-000001 for 183.92, due 2026-08-24"},
   {"actor":"clerk","action":"PAYMENT_APPLIED","fromStatus":"ISSUED","toStatus":"PART_PAID","detail":"100.00 applied, 83.92 outstanding"},
   {"actor":"admin","action":"CREDITED","fromStatus":"PART_PAID","toStatus":"PART_PAID","detail":"CN-2026-000001 for 8.00: one field guide returned damaged"}],
  "page":0,"size":50,"totalElements":3,"totalPages":1}
