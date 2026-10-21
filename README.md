@@ -530,3 +530,7 @@ time. Jobs are switched off in tests.
 - Publish invoice and payment events through a transactional outbox for downstream systems.
 - Customer statements and payment reminders for overdue invoices.
 - Testcontainers-based tests alongside the embedded database where Docker is available.
+
+---
+
+Developed locally in June to July 2026 and published to GitHub in October 2026.
